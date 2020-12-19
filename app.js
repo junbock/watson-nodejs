@@ -33,6 +33,9 @@ var bankFunctions = new BankFunctions();
 var mysql = require('mysql');
 var db_config = require('./config/db-config.json')
 
+const axios = require('axios');
+var urlencode = require('urlencode');
+
 const { response } = require('express');
 const { connected } = require('process');
 const { type, freemem } = require('os');
@@ -322,6 +325,7 @@ app.post('/api/update', function(req,res){
   }
   
   let dateString = year+"-"+month+"-"+date;
+  print
   let sql = "UPDATE Diary SET image=?, content=? WHERE DATE(dateTime)=? AND user_id=?";
   let params = [image, content, dateString, userId];
   connection.query(sql,params,function(err,result){
@@ -343,26 +347,40 @@ app.post('/api/finish', function(req, res) {
   }
   connection.query('SELECT * FROM Entity WHERE session_id = ?',sessionId,function(err,rows){
     if (err) throw 'error...';
-    let concat = '';
-    if(rows[0].why_col) concat += rows[0].why_col + '해서';
-    if(rows[0].what_col) concat += ' ' + Josa(rows[0].what_col,'을');
-    if(rows[0].where_col) concat += ' ' + rows[0].where_col + '에서';
-    if(rows[0].who_col) concat += ' ' + Josa(rows[0].who_col,'와');
-    if(rows[0].when_col) concat += ' ' + rows[0].when_col + '에';
-    if(rows[0].how_col) concat += ' ' + rows[0].how_col;
-    concat+='다.';
-        
-    console.log(concat);
+    var url = 'http://3.35.104.72:5000/diary/'
 
-    let diary_sql = 'INSERT INTO Diary (session_id, user_id, content)VALUE (?,?,?)';
-    let diary_params = [sessionId,userId,concat];
-    connection.query(diary_sql,diary_params,function(err,result){
-    if (err) throw 'diary insert err'+err;
-    console.info('diary 테이블 insert 성공');
-    return res.json(concat);
+    let concat = '';
+    // if(rows[0].why_col) concat += rows[0].why_col;
+    if(rows[0].what_col) concat += rows[0].what_col;
+    if(rows[0].where_col) concat += ',' + rows[0].where_col;
+    if(rows[0].who_col) concat += ',' + rows[0].who_col;
+    if(rows[0].when_col) concat += ',' + rows[0].when_col;
+    if(rows[0].how_col) concat += ',' + rows[0].how_col;
+    
+    concat = urlencode(concat)
+    axios.get(url+concat).then((Response)=>{
+      let diary_sql = 'INSERT INTO Diary (session_id, user_id, content)VALUE (?,?,?)';
+      let diary_params = [sessionId,userId,Response.data.request];
+      connection.query(diary_sql,diary_params,function(err,result){
+        if (err) throw 'diary insert err'+err;
+        console.info('diary 테이블 insert 성공');
+        return res.json(concat);
+      });
+    }).catch((Error)=>{
+      console.log(Error);
+    });
+        
+    // console.log(concat);
+
+    // let diary_sql = 'INSERT INTO Diary (session_id, user_id, content)VALUE (?,?,?)';
+    // let diary_params = [sessionId,userId,concat];
+    // connection.query(diary_sql,diary_params,function(err,result){
+    // if (err) throw 'diary insert err'+err;
+    // console.info('diary 테이블 insert 성공');
+    // return res.json(concat);
     });
   });
-});
+
 
 // 특정 날짜의 일기 받기 
 app.get('/api/diary',(req,res)=>{
